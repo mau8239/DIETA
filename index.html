@@ -489,9 +489,31 @@
                 return fallbackValue;
             }
 
+            function isEmptyObject(value) {
+                return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0;
+            }
+
+            function shouldFallbackToLocal(normalized) {
+                if (normalized === null || normalized === undefined) return true;
+                if (Array.isArray(normalized) && normalized.length === 0) return true;
+                if (isEmptyObject(normalized)) return true;
+                return false;
+            }
+
             try {
                 const result = await dbGet(action);
-                return normalizeCloudData(result);
+                const normalized = normalizeCloudData(result);
+                if (!shouldFallbackToLocal(normalized)) return normalized;
+
+                // Si la nube responde vacío, preferimos lo local para no perder datos.
+                const local = localStorage.getItem(key);
+                if (!local) return fallbackValue;
+                try {
+                    return JSON.parse(local);
+                } catch (parseError) {
+                    localStorage.removeItem(key);
+                    return fallbackValue;
+                }
             } catch (error) {
                 // Solo si falla la conexión usamos local como respaldo.
                 console.warn(`No se pudo cargar ${action} desde la nube, usando localStorage.`, error);
@@ -962,13 +984,13 @@
                 loadCloudData('getHistory', HISTORY_KEY, {})
             ]);
 
-            if (historyData && typeof historyData === 'object' && !Array.isArray(historyData)) {
+            if (historyData && typeof historyData === 'object' && !Array.isArray(historyData) && Object.keys(historyData).length > 0) {
                 localStorage.setItem(HISTORY_KEY, JSON.stringify(historyData));
             }
-            if (targetsData && typeof targetsData === 'object' && !Array.isArray(targetsData)) {
+            if (targetsData && typeof targetsData === 'object' && !Array.isArray(targetsData) && Object.keys(targetsData).length > 0) {
                 localStorage.setItem(TARGETS_KEY, JSON.stringify(targetsData));
             }
-            if (Array.isArray(inventoryData)) {
+            if (Array.isArray(inventoryData) && inventoryData.length > 0) {
                 localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventoryData));
             }
             if (dayStateData && typeof dayStateData === 'object' && !Array.isArray(dayStateData)) {
