@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Registro de Alimentos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8fafc;
+            touch-action: manipulation;
+            /* Evitamos el rebote elástico en iOS para una sensación más de app */
+            overscroll-behavior-y: none;
+        }
+        .progress-bar {
+            transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.18), 0 6px 12px rgba(15, 23, 42, 0.2);
+        }
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                110deg,
+                rgba(255, 255, 255, 0) 20%,
+                rgba(255, 255, 255, 0.3) 45%,
+                rgba(255, 255, 255, 0) 70%
+            );
+            background-size: 180% 100%;
+            animation: gymShine 2.6s linear infinite;
+        }
+        @keyframes gymShine {
+            from { background-position: 180% 0; }
+            to { background-position: -80% 0; }
+        }
+        .progress-track {
+            height: 14px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            padding: 2px;
+            box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.08);
+        }
+        .macro-chip {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #0f172a;
+            color: #f8fafc;
+        }
+        .inventory-table {
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            overflow: hidden;
+            background: #ffffff;
+        }
+        .inventory-row {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr 1fr;
+            gap: 10px;
+            padding: 10px;
+            border-top: 1px solid #f1f5f9;
+            background: #ffffff;
+        }
+        .inventory-row:first-child {
+            border-top: none;
+        }
+        .inventory-input {
+            height: 40px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            padding: 0 12px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #334155;
+        }
+        .inventory-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        .inventory-input.number {
+            text-align: center;
+            font-weight: 700;
+        }
+        .card {
+            border-radius: 24px;
+        }
+        /* Estilo para los inputs para que no se vean nativos de desktop */
+        input {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-24">
+
+    <!-- Header / Status Bars (Ya NO es sticky) -->
+    <div id="summary-header" class="bg-white p-6 shadow-sm border-b border-gray-100">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-extrabold text-gray-900 tracking-tight">Mi Diario</h1>
+            <span class="text-xs font-bold px-3 py-1 bg-blue-50 text-blue-600 rounded-full">HOY</span>
+        </div>
+        
+        <div class="space-y-5">
+            <!-- Proteína (Roja) -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center text-sm font-bold text-gray-700">
+                    <div class="flex items-center gap-2">
+                        <!-- Icono Pierna de Pollo -->
+                        <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M15 15c-1.5 1.5-4.5 3-7 3s-3-2.5-3-4.5c0-2 2-4.5 4-6 2.5-2 5-2 6-1s.5 4-1 6.5Z"/>
+                            <path d="m14 14 5 5M17 11l4 4"/>
+                        </svg>
+                        <span>Proteína</span>
+                        <span id="protein-current" class="text-xs text-gray-500 font-semibold">0 g</span>
+                    </div>
+                    <span id="protein-val" class="macro-chip">Faltan 120 g</span>
+                </div>
+                <div class="progress-track">
+                    <div id="protein-bar" class="progress-bar h-full rounded-full bg-gradient-to-r from-rose-500 via-red-500 to-orange-400" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Carbohidratos (Amarilla) -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center text-sm font-bold text-gray-700">
+                    <div class="flex items-center gap-2">
+                        <!-- Icono Rayo -->
+                        <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21Z"/>
+                        </svg>
+                        <span>Carbohidratos</span>
+                        <span id="energy-current" class="text-xs text-gray-500 font-semibold">0 g</span>
+                    </div>
+                    <span id="energy-val" class="macro-chip">Faltan 300 g</span>
+                </div>
+                <div class="progress-track">
+                    <div id="energy-bar" class="progress-bar h-full rounded-full bg-gradient-to-r from-amber-400 via-yellow-400 to-lime-400" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Agua (Azul) -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center text-sm font-bold text-gray-700">
+                    <div class="flex items-center gap-2">
+                        <!-- Icono Gota -->
+                        <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 21.5c-3.31 0-6-2.69-6-6 0-3.1 3-7 6-11 3 4 6 7.9 6 11 0 3.31-2.69 6-6 6Zm0-2c2.21 0 4-1.79 4-4 0-2.07-2.33-5.28-4-7.41-1.67 2.13-4 5.34-4 7.41 0 2.21 1.79 4 4 4Z"/>
+                        </svg>
+                        <span>Hidratación</span>
+                        <span id="water-current" class="text-xs text-gray-500 font-semibold">0 ml</span>
+                    </div>
+                    <span id="water-val" class="macro-chip">Faltan 2500 ml</span>
+                </div>
+                <div class="progress-track">
+                    <div id="water-bar" class="progress-bar h-full rounded-full bg-gradient-to-r from-sky-500 via-blue-500 to-cyan-400" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Food Module -->
+    <main id="screen-summary" class="p-5 space-y-8">
+        <section class="card bg-white p-6 shadow-sm border border-gray-100">
+            <h2 class="text-lg font-bold text-gray-800 mb-5 flex items-center gap-2">
+                <span class="w-2 h-6 bg-blue-600 rounded-full"></span>
+                Nuevo Registro
+            </h2>
+            <form id="foodForm" class="space-y-5">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre del Alimento</label>
+                    <input type="text" id="foodName" list="foodSuggestions" autocomplete="off" required placeholder="Escribe para buscar en inventario..." class="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 text-gray-700 font-medium">
+                    <datalist id="foodSuggestions"></datalist>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Cantidad en gramos</label>
+                    <input type="number" id="gramsQty" placeholder="150" class="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500 text-gray-700 font-medium">
+                </div>
+                
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-red-50/30 p-2 rounded-2xl">
+                        <label class="block text-[10px] font-bold text-red-400 uppercase text-center mb-1">Prot(g)</label>
+                        <input type="number" id="protQty" placeholder="0" readonly class="w-full text-center bg-transparent border-none focus:ring-0 text-lg font-bold text-gray-700">
+                    </div>
+                    <div class="bg-yellow-50/30 p-2 rounded-2xl">
+                        <label class="block text-[10px] font-bold text-yellow-600 uppercase text-center mb-1">Carb(g)</label>
+                        <input type="number" id="calQty" placeholder="0" readonly class="w-full text-center bg-transparent border-none focus:ring-0 text-lg font-bold text-gray-700">
+                    </div>
+                    <div class="bg-blue-50/30 p-2 rounded-2xl">
+                        <label class="block text-[10px] font-bold text-blue-400 uppercase text-center mb-1">Agua(ml)</label>
+                        <input type="number" id="waterQty" placeholder="0" class="w-full text-center bg-transparent border-none focus:ring-0 text-lg font-bold text-gray-700">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-gray-900 text-white font-bold py-5 rounded-2xl shadow-xl active:scale-95 transition-all flex justify-center items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                    Registrar Ahora
+                </button>
+            </form>
+        </section>
+    </main>
+
+    <main id="screen-inventory" class="p-5 hidden">
+        <section class="card bg-white p-6 shadow-sm border border-gray-100">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span class="w-2 h-6 bg-gray-900 rounded-full"></span>
+                    Inventario de Alimentos
+                </h2>
+                <button id="saveInventoryBtn" class="text-xs font-extrabold uppercase tracking-wide bg-gray-900 text-white px-4 py-2 rounded-xl">
+                    Guardar
+                </button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 text-[10px] font-extrabold uppercase tracking-wider text-gray-400 px-2 mb-2">
+                <p>Alimento</p>
+                <p class="text-center">Proteina / 100g</p>
+                <p class="text-center">Carbohidratos</p>
+            </div>
+
+            <div class="inventory-table">
+                <div id="inventoryRows">
+                    <!-- Filas de inventario -->
+                </div>
+            </div>
+
+            <button id="addInventoryRowBtn" class="w-full mt-4 bg-blue-600 text-white font-extrabold py-3 rounded-2xl shadow-md active:scale-[0.99] transition-all">
+                Agregar fila
+            </button>
+        </section>
+    </main>
+
+    <main id="screen-parameters" class="p-5 hidden">
+        <section class="card bg-white p-6 shadow-sm border border-gray-100 space-y-5">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span class="w-2 h-6 bg-indigo-600 rounded-full"></span>
+                    Parámetros Diarios
+                </h2>
+                <button id="saveParamsBtn" class="text-xs font-extrabold uppercase tracking-wide bg-indigo-600 text-white px-4 py-2 rounded-xl">
+                    Guardar
+                </button>
+            </div>
+
+            <p class="text-sm text-gray-500">Configura tus metas para que las barras de resumen se calculen con estos valores.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Meta de Proteína (g)</label>
+                    <input id="targetProtein" type="number" min="1" step="1" class="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 text-gray-700 font-medium" placeholder="120">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Meta de Carbohidratos (g)</label>
+                    <input id="targetEnergy" type="number" min="1" step="1" class="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 text-gray-700 font-medium" placeholder="300">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Meta de Agua (ml)</label>
+                    <input id="targetWater" type="number" min="1" step="1" class="w-full p-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 text-gray-700 font-medium" placeholder="2500">
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <main id="screen-statistics" class="p-5 hidden">
+        <section class="card bg-white p-6 shadow-sm border border-gray-100 space-y-5">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span class="w-2 h-6 bg-emerald-600 rounded-full"></span>
+                    Estadísticas Mensuales
+                </h2>
+                <input id="statsMonth" type="month" class="text-sm font-semibold bg-gray-50 border-none rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 text-gray-700">
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+                <div class="bg-emerald-50 rounded-2xl p-3 text-center">
+                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700">Días cumplidos</p>
+                    <p id="statsMetDays" class="text-2xl font-black text-emerald-800">0</p>
+                </div>
+                <div class="bg-rose-50 rounded-2xl p-3 text-center">
+                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-rose-700">No cumplidos</p>
+                    <p id="statsMissedDays" class="text-2xl font-black text-rose-800">0</p>
+                </div>
+                <div class="bg-slate-100 rounded-2xl p-3 text-center">
+                    <p class="text-[10px] font-extrabold uppercase tracking-wider text-slate-600">% Cumplimiento</p>
+                    <p id="statsRate" class="text-2xl font-black text-slate-800">0%</p>
+                </div>
+            </div>
+
+            <div>
+                <div class="grid grid-cols-7 text-[10px] font-extrabold uppercase tracking-wider text-gray-400 mb-2 px-1">
+                    <p class="text-center">Lun</p>
+                    <p class="text-center">Mar</p>
+                    <p class="text-center">Mié</p>
+                    <p class="text-center">Jue</p>
+                    <p class="text-center">Vie</p>
+                    <p class="text-center">Sáb</p>
+                    <p class="text-center">Dom</p>
+                </div>
+                <div id="statsCalendar" class="grid grid-cols-7 gap-2"></div>
+            </div>
+
+            <div class="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-2">
+                <span class="inline-flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500"></span>Cumplido</span>
+                <span class="inline-flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-rose-400"></span>No cumplido</span>
+                <span class="inline-flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-400"></span>Parcial (hoy)</span>
+                <span class="inline-flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-gray-200"></span>Sin datos</span>
+            </div>
+        </section>
+    </main>
+
+    <div id="dayDetailModal" class="fixed inset-0 bg-black/40 hidden items-end sm:items-center justify-center z-50 p-4">
+        <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-gray-100 p-5 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 id="dayDetailTitle" class="text-lg font-extrabold text-gray-800">Detalle del día</h3>
+                <button id="closeDayDetailModal" class="text-gray-400 hover:text-gray-700 text-2xl leading-none px-2">&times;</button>
+            </div>
+            <p id="dayDetailSubtitle" class="text-sm text-gray-500">Revisión de metas</p>
+
+            <div class="space-y-3">
+                <div class="flex items-center justify-between bg-red-50 rounded-2xl px-4 py-3">
+                    <span class="text-sm font-bold text-red-700">Proteína</span>
+                    <span id="missingProtein" class="text-sm font-extrabold text-red-800">0 g</span>
+                </div>
+                <div class="flex items-center justify-between bg-yellow-50 rounded-2xl px-4 py-3">
+                    <span class="text-sm font-bold text-yellow-700">Carbohidratos</span>
+                    <span id="missingEnergy" class="text-sm font-extrabold text-yellow-800">0 g</span>
+                </div>
+                <div class="flex items-center justify-between bg-blue-50 rounded-2xl px-4 py-3">
+                    <span class="text-sm font-bold text-blue-700">Agua</span>
+                    <span id="missingWater" class="text-sm font-extrabold text-blue-800">0 ml</span>
+                </div>
+            </div>
+
+            <button id="closeDayDetailModalBtn" class="w-full bg-gray-900 text-white font-bold py-3 rounded-2xl">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 w-full bg-white/80 backdrop-blur-md border-t border-gray-100 flex justify-around py-3 px-6 pb-6">
+        <button id="tab-summary" class="flex flex-col items-center text-blue-600">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z"/></svg>
+            <span class="text-[10px] mt-1 font-bold">Resumen</span>
+        </button>
+        <button id="tab-inventory" class="flex flex-col items-center text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M4 7h16M4 12h16M4 17h10"/>
+                <path d="M17 16.5h3v3h-3z"/>
+            </svg>
+            <span class="text-[10px] mt-1 font-bold">INVENTARIO</span>
+        </button>
+        <button id="tab-parameters" class="flex flex-col items-center text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M10.3 3.8c.5-1.1 2.1-1.1 2.6 0l.5 1.3c.2.5.7.8 1.2.9l1.4.2c1.2.2 1.7 1.6.8 2.4l-1.1.9c-.4.4-.6 1-.5 1.5l.3 1.4c.2 1.2-1 2.1-2.1 1.5l-1.2-.7c-.5-.3-1-.3-1.5 0l-1.2.7c-1.1.6-2.3-.3-2.1-1.5l.3-1.4c.1-.5-.1-1.1-.5-1.5L6 8.6c-.9-.8-.4-2.2.8-2.4l1.4-.2c.5-.1 1-.4 1.2-.9l.9-1.3Z"/>
+                <circle cx="11.6" cy="9.4" r="1.8"/>
+            </svg>
+            <span class="text-[10px] mt-1 font-bold">PARÁMETROS</span>
+        </button>
+        <button id="tab-statistics" class="flex flex-col items-center text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M4 19h16"/>
+                <path d="M7 16V9"/>
+                <path d="M12 16V5"/>
+                <path d="M17 16v-4"/>
+            </svg>
+            <span class="text-[10px] mt-1 font-bold">ESTADÍSTICAS</span>
+        </button>
+    </nav>
+
+    <script>
+        // Metas diarias configurables
+        const targets = { protein: 120, energy: 300, water: 2500 };
+        let current = { protein: 0, energy: 0, water: 0 };
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwIvuQII1KgBiKjIq5NTr9s5CQAvZZfsk8uxOwZKXjM-7p7VoCst2P-CLuL6POy_dFy/exec';
+        const INVENTORY_KEY = 'gym_inventory_v1';
+        const TARGETS_KEY = 'gym_targets_v1';
+        const DAY_STATE_KEY = 'gym_day_state_v1';
+        const HISTORY_KEY = 'gym_history_v1';
+
+        const form = document.getElementById('foodForm');
+        const summaryHeader = document.getElementById('summary-header');
+        const summaryScreen = document.getElementById('screen-summary');
+        const inventoryScreen = document.getElementById('screen-inventory');
+        const parametersScreen = document.getElementById('screen-parameters');
+        const statisticsScreen = document.getElementById('screen-statistics');
+        const tabSummary = document.getElementById('tab-summary');
+        const tabInventory = document.getElementById('tab-inventory');
+        const tabParameters = document.getElementById('tab-parameters');
+        const tabStatistics = document.getElementById('tab-statistics');
+        const saveInventoryBtn = document.getElementById('saveInventoryBtn');
+        const saveParamsBtn = document.getElementById('saveParamsBtn');
+        const addInventoryRowBtn = document.getElementById('addInventoryRowBtn');
+        const inventoryRows = document.getElementById('inventoryRows');
+        const foodNameInput = document.getElementById('foodName');
+        const foodSuggestions = document.getElementById('foodSuggestions');
+        const gramsInput = document.getElementById('gramsQty');
+        const proteinInput = document.getElementById('protQty');
+        const carbsInput = document.getElementById('calQty');
+        const targetProteinInput = document.getElementById('targetProtein');
+        const targetEnergyInput = document.getElementById('targetEnergy');
+        const targetWaterInput = document.getElementById('targetWater');
+        const statsMonthInput = document.getElementById('statsMonth');
+        const dayDetailModal = document.getElementById('dayDetailModal');
+        const dayDetailTitle = document.getElementById('dayDetailTitle');
+        const dayDetailSubtitle = document.getElementById('dayDetailSubtitle');
+        const missingProtein = document.getElementById('missingProtein');
+        const missingEnergy = document.getElementById('missingEnergy');
+        const missingWater = document.getElementById('missingWater');
+        const closeDayDetailModal = document.getElementById('closeDayDetailModal');
+        const closeDayDetailModalBtn = document.getElementById('closeDayDetailModalBtn');
+
+        async function dbGet(action) {
+            const url = `${APPS_SCRIPT_URL}?action=${encodeURIComponent(action)}`;
+            const response = await fetch(url, { method: 'GET' });
+            if (!response.ok) throw new Error(`GET ${action} failed`);
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch (error) {
+                return text;
+            }
+        }
+
+        async function dbPost(action, data) {
+            const response = await fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action, data })
+            });
+            if (!response.ok) throw new Error(`POST ${action} failed`);
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch (error) {
+                return text;
+            }
+        }
+
+        async function saveCloudData(action, key, data) {
+            try {
+                await dbPost(action, data);
+            } catch (error) {
+                localStorage.setItem(key, JSON.stringify(data));
+                console.warn(`No se pudo guardar ${action} en la nube, se guardó localmente.`, error);
+            }
+        }
+
+        async function loadCloudData(action, key, fallbackValue) {
+            function parseCellAsJson(value) {
+                if (typeof value !== 'string') return null;
+                const trimmed = value.trim();
+                if (!trimmed) return null;
+                try {
+                    return JSON.parse(trimmed);
+                } catch (error) {
+                    return null;
+                }
+            }
+
+            function normalizeCloudData(result) {
+                // Formato ideal: { ok: true, data: ... }
+                if (result && typeof result === 'object' && !Array.isArray(result) && 'data' in result) {
+                    return result.data;
+                }
+
+                // Formato alterno común: { result: "success", data: ... }
+                if (result && typeof result === 'object' && !Array.isArray(result) && result.result === 'success' && 'data' in result) {
+                    return result.data;
+                }
+
+                // Formato de hoja cruda: [["..."]]
+                if (Array.isArray(result)) {
+                    const firstRow = result[0];
+                    const firstCell = Array.isArray(firstRow) ? firstRow[0] : null;
+                    const parsedFromCell = parseCellAsJson(firstCell);
+                    if (parsedFromCell !== null) return parsedFromCell;
+                    if (typeof firstCell === 'string' && firstCell.trim() === '') return fallbackValue;
+                    return fallbackValue;
+                }
+
+                return fallbackValue;
+            }
+
+            function isEmptyObject(value) {
+                return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0;
+            }
+
+            function shouldFallbackToLocal(normalized) {
+                if (normalized === null || normalized === undefined) return true;
+                if (Array.isArray(normalized) && normalized.length === 0) return true;
+                if (isEmptyObject(normalized)) return true;
+                return false;
+            }
+
+            try {
+                const result = await dbGet(action);
+                const normalized = normalizeCloudData(result);
+                if (!shouldFallbackToLocal(normalized)) return normalized;
+
+                // Si la nube responde vacío, preferimos lo local para no perder datos.
+                const local = localStorage.getItem(key);
+                if (!local) return fallbackValue;
+                try {
+                    return JSON.parse(local);
+                } catch (parseError) {
+                    localStorage.removeItem(key);
+                    return fallbackValue;
+                }
+            } catch (error) {
+                // Solo si falla la conexión usamos local como respaldo.
+                console.warn(`No se pudo cargar ${action} desde la nube, usando localStorage.`, error);
+                const local = localStorage.getItem(key);
+                if (!local) return fallbackValue;
+                try {
+                    return JSON.parse(local);
+                } catch (parseError) {
+                    localStorage.removeItem(key);
+                    return fallbackValue;
+                }
+            }
+        }
+
+        function getTodayKey() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getMonthFromDateKey(dateKey) {
+            return dateKey.slice(0, 7);
+        }
+
+        function getCurrentMonthValue() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            return `${year}-${month}`;
+        }
+
+        function didMeetGoals(entry) {
+            return (
+                entry.current.protein >= entry.targets.protein &&
+                entry.current.energy >= entry.targets.energy &&
+                entry.current.water >= entry.targets.water
+            );
+        }
+
+        function parseLocalJson(key) {
+            const raw = localStorage.getItem(key);
+            if (!raw) return {};
+            try {
+                const parsed = JSON.parse(raw);
+                return parsed && typeof parsed === 'object' ? parsed : {};
+            } catch (error) {
+                localStorage.removeItem(key);
+                return {};
+            }
+        }
+
+        function parseLocalArray(key) {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : null;
+            } catch (error) {
+                localStorage.removeItem(key);
+                return null;
+            }
+        }
+
+        function loadHistory() {
+            return parseLocalJson(HISTORY_KEY);
+        }
+
+        function saveHistory(history) {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+            saveCloudData('saveHistory', HISTORY_KEY, history);
+        }
+
+        function saveTodayState() {
+            const today = getTodayKey();
+            const payload = {
+                date: today,
+                current: { ...current },
+                targets: { ...targets }
+            };
+            localStorage.setItem(DAY_STATE_KEY, JSON.stringify(payload));
+            saveCloudData('saveDayState', DAY_STATE_KEY, payload);
+        }
+
+        function updateHistoryForToday() {
+            const today = getTodayKey();
+            const history = loadHistory();
+            const entry = {
+                date: today,
+                current: { ...current },
+                targets: { ...targets },
+                met: didMeetGoals({ current, targets })
+            };
+            history[today] = entry;
+            saveHistory(history);
+        }
+
+        function loadTodayState(dayStateData) {
+            const today = getTodayKey();
+            const parsed = dayStateData || parseLocalJson(DAY_STATE_KEY);
+
+            if (!parsed || !parsed.date) {
+                current = { protein: 0, energy: 0, water: 0 };
+                saveTodayState();
+                updateHistoryForToday();
+                return;
+            }
+
+            try {
+                if (typeof parsed !== 'object' || !parsed.date) {
+                    throw new Error('Invalid day state');
+                }
+
+                if (parsed.date !== today) {
+                    // Cambió el día: reiniciamos acumulados diarios y empezamos nuevo registro.
+                    current = { protein: 0, energy: 0, water: 0 };
+                    saveTodayState();
+                    updateHistoryForToday();
+                    return;
+                }
+
+                current = {
+                    protein: parseFloat(parsed.current?.protein) || 0,
+                    energy: parseFloat(parsed.current?.energy) || 0,
+                    water: parseFloat(parsed.current?.water) || 0
+                };
+                updateHistoryForToday();
+            } catch (error) {
+                localStorage.removeItem(DAY_STATE_KEY);
+                current = { protein: 0, energy: 0, water: 0 };
+                saveTodayState();
+                updateHistoryForToday();
+            }
+        }
+
+        function getDaysInMonth(year, monthIndex) {
+            return new Date(year, monthIndex + 1, 0).getDate();
+        }
+
+        function toMondayFirstIndex(jsDay) {
+            return jsDay === 0 ? 6 : jsDay - 1;
+        }
+
+        function renderStatistics() {
+            const monthValue = statsMonthInput.value || getCurrentMonthValue();
+            const [yearStr, monthStr] = monthValue.split('-');
+            const year = parseInt(yearStr, 10);
+            const monthIndex = parseInt(monthStr, 10) - 1;
+            if (Number.isNaN(year) || Number.isNaN(monthIndex)) return;
+
+            const totalDays = getDaysInMonth(year, monthIndex);
+            const firstDay = new Date(year, monthIndex, 1).getDay();
+            const leadBlanks = toMondayFirstIndex(firstDay);
+
+            const history = loadHistory();
+            const today = getTodayKey();
+            const selectedMonth = `${yearStr}-${monthStr}`;
+
+            const calendar = document.getElementById('statsCalendar');
+            calendar.innerHTML = '';
+
+            let metDays = 0;
+            let missedDays = 0;
+
+            for (let i = 0; i < leadBlanks; i++) {
+                const empty = document.createElement('div');
+                empty.className = 'h-11 rounded-xl';
+                calendar.appendChild(empty);
+            }
+
+            for (let day = 1; day <= totalDays; day++) {
+                const dateKey = `${selectedMonth}-${String(day).padStart(2, '0')}`;
+                const record = history[dateKey];
+                const isToday = dateKey === today;
+
+                let bgClass = 'bg-gray-200 text-gray-500';
+                let subtitle = 'Sin datos';
+
+                if (record) {
+                    const isMet = Boolean(record.met);
+                    if (isMet) {
+                        bgClass = 'bg-emerald-500 text-white';
+                        subtitle = 'Cumplido';
+                        metDays++;
+                    } else if (isToday) {
+                        bgClass = 'bg-amber-400 text-white';
+                        subtitle = 'Hoy';
+                        missedDays++;
+                    } else {
+                        bgClass = 'bg-rose-400 text-white';
+                        subtitle = 'No';
+                        missedDays++;
+                    }
+                }
+
+                const cell = document.createElement('div');
+                cell.className = `h-11 rounded-xl flex flex-col items-center justify-center text-[10px] font-bold ${bgClass}`;
+                cell.title = `${dateKey} - ${subtitle}`;
+                cell.innerHTML = `<span class="text-sm leading-3">${day}</span><span>${subtitle}</span>`;
+                cell.addEventListener('click', () => openDayDetail(dateKey, record));
+                calendar.appendChild(cell);
+            }
+
+            const trackedDays = metDays + missedDays;
+            const rate = trackedDays > 0 ? Math.round((metDays / trackedDays) * 100) : 0;
+            document.getElementById('statsMetDays').innerText = String(metDays);
+            document.getElementById('statsMissedDays').innerText = String(missedDays);
+            document.getElementById('statsRate').innerText = `${rate}%`;
+        }
+
+        function openDayDetail(dateKey, record) {
+            dayDetailTitle.innerText = `Detalle ${dateKey}`;
+
+            if (!record) {
+                dayDetailSubtitle.innerText = 'Sin registros para este día.';
+                missingProtein.innerText = 'Sin datos';
+                missingEnergy.innerText = 'Sin datos';
+                missingWater.innerText = 'Sin datos';
+            } else {
+                const proteinMissing = Math.max((record.targets?.protein || 0) - (record.current?.protein || 0), 0);
+                const energyMissing = Math.max((record.targets?.energy || 0) - (record.current?.energy || 0), 0);
+                const waterMissing = Math.max((record.targets?.water || 0) - (record.current?.water || 0), 0);
+                const metAll = proteinMissing === 0 && energyMissing === 0 && waterMissing === 0;
+
+                dayDetailSubtitle.innerText = metAll ? 'Cumpliste todas las metas ese día.' : 'Esto te faltó para cumplir ese día:';
+                missingProtein.innerText = `${proteinMissing.toFixed(1)} g`;
+                missingEnergy.innerText = `${energyMissing.toFixed(1)} g`;
+                missingWater.innerText = `${waterMissing.toFixed(1)} ml`;
+            }
+
+            dayDetailModal.classList.remove('hidden');
+            dayDetailModal.classList.add('flex');
+        }
+
+        function closeDayModal() {
+            dayDetailModal.classList.add('hidden');
+            dayDetailModal.classList.remove('flex');
+        }
+        
+        function updateUI() {
+            // Porcentajes
+            const pPct = Math.min((current.protein / targets.protein) * 100, 100);
+            const ePct = Math.min((current.energy / targets.energy) * 100, 100);
+            const wPct = Math.min((current.water / targets.water) * 100, 100);
+            const proteinLeft = Math.max(targets.protein - current.protein, 0);
+            const energyLeft = Math.max(targets.energy - current.energy, 0);
+            const waterLeft = Math.max(targets.water - current.water, 0);
+
+            document.getElementById('protein-bar').style.width = pPct + '%';
+            document.getElementById('protein-current').innerText = `${current.protein.toFixed(1)} g`;
+            document.getElementById('protein-val').innerText = `Faltan ${proteinLeft.toFixed(1)} g`;
+            
+            document.getElementById('energy-bar').style.width = ePct + '%';
+            document.getElementById('energy-current').innerText = `${current.energy.toFixed(1)} g`;
+            document.getElementById('energy-val').innerText = `Faltan ${energyLeft.toFixed(1)} g`;
+            
+            document.getElementById('water-bar').style.width = wPct + '%';
+            document.getElementById('water-current').innerText = `${current.water.toFixed(1)} ml`;
+            document.getElementById('water-val').innerText = `Faltan ${waterLeft.toFixed(1)} ml`;
+
+            saveTodayState();
+            updateHistoryForToday();
+            renderStatistics();
+        }
+
+        function setActiveTab(tab) {
+            const on = ['text-blue-600'];
+            const off = ['text-gray-300'];
+
+            tabSummary.classList.remove(...on, ...off);
+            tabInventory.classList.remove(...on, ...off);
+            tabParameters.classList.remove(...on, ...off);
+            tabStatistics.classList.remove(...on, ...off);
+
+            tabSummary.classList.add(...off);
+            tabInventory.classList.add(...off);
+            tabParameters.classList.add(...off);
+            tabStatistics.classList.add(...off);
+
+            if (tab === 'inventory') {
+                summaryHeader.classList.add('hidden');
+                summaryScreen.classList.add('hidden');
+                parametersScreen.classList.add('hidden');
+                statisticsScreen.classList.add('hidden');
+                inventoryScreen.classList.remove('hidden');
+                tabInventory.classList.remove(...off);
+                tabInventory.classList.add(...on);
+            } else if (tab === 'parameters') {
+                summaryHeader.classList.add('hidden');
+                summaryScreen.classList.add('hidden');
+                inventoryScreen.classList.add('hidden');
+                statisticsScreen.classList.add('hidden');
+                parametersScreen.classList.remove('hidden');
+                tabParameters.classList.remove(...off);
+                tabParameters.classList.add(...on);
+            } else if (tab === 'statistics') {
+                summaryHeader.classList.add('hidden');
+                summaryScreen.classList.add('hidden');
+                inventoryScreen.classList.add('hidden');
+                parametersScreen.classList.add('hidden');
+                statisticsScreen.classList.remove('hidden');
+                tabStatistics.classList.remove(...off);
+                tabStatistics.classList.add(...on);
+                renderStatistics();
+            } else {
+                summaryHeader.classList.remove('hidden');
+                inventoryScreen.classList.add('hidden');
+                parametersScreen.classList.add('hidden');
+                statisticsScreen.classList.add('hidden');
+                summaryScreen.classList.remove('hidden');
+                tabSummary.classList.remove(...off);
+                tabSummary.classList.add(...on);
+            }
+        }
+
+        function fillTargetsInputs() {
+            targetProteinInput.value = targets.protein;
+            targetEnergyInput.value = targets.energy;
+            targetWaterInput.value = targets.water;
+        }
+
+        async function saveTargets() {
+            const protein = parseFloat(targetProteinInput.value);
+            const energy = parseFloat(targetEnergyInput.value);
+            const water = parseFloat(targetWaterInput.value);
+
+            if (protein > 0) targets.protein = protein;
+            if (energy > 0) targets.energy = energy;
+            if (water > 0) targets.water = water;
+
+            localStorage.setItem(TARGETS_KEY, JSON.stringify(targets));
+            await saveCloudData('saveTargets', TARGETS_KEY, targets);
+            fillTargetsInputs();
+            updateUI();
+            if (window.navigator.vibrate) window.navigator.vibrate(12);
+        }
+
+        function loadTargets(targetsData) {
+            const saved = targetsData || parseLocalJson(TARGETS_KEY);
+            if (!saved || Object.keys(saved).length === 0) {
+                fillTargetsInputs();
+                return;
+            }
+
+            try {
+                const parsed = saved;
+                if (parsed && typeof parsed === 'object') {
+                    const protein = parseFloat(parsed.protein);
+                    const energy = parseFloat(parsed.energy);
+                    const water = parseFloat(parsed.water);
+
+                    if (protein > 0) targets.protein = protein;
+                    if (energy > 0) targets.energy = energy;
+                    if (water > 0) targets.water = water;
+                }
+            } catch (error) {
+                localStorage.removeItem(TARGETS_KEY);
+            }
+
+            fillTargetsInputs();
+        }
+
+        function addInventoryRow(item = {}) {
+            const row = document.createElement('div');
+            row.className = 'inventory-row';
+            row.innerHTML = `
+                <input data-field="name" placeholder="Ej. Pechuga de pollo" class="inventory-input" value="${item.name || ''}" />
+                <input data-field="protein" type="number" placeholder="0" class="inventory-input number" value="${item.protein || ''}" />
+                <input data-field="carbs" type="number" placeholder="0" class="inventory-input number" value="${item.carbs || ''}" />
+            `;
+            inventoryRows.appendChild(row);
+        }
+
+        function getInventoryItems() {
+            const rows = Array.from(inventoryRows.children)
+                .map((row) => {
+                    const name = row.querySelector('[data-field="name"]').value.trim();
+                    const protein = parseFloat(row.querySelector('[data-field="protein"]').value) || 0;
+                    const carbs = parseFloat(row.querySelector('[data-field="carbs"]').value) || 0;
+                    return { name, protein, carbs };
+                })
+                .filter((item) => item.name);
+
+            return rows;
+        }
+
+        function refreshFoodOptions() {
+            const items = getInventoryItems();
+            foodSuggestions.innerHTML = '';
+
+            items.forEach((item) => {
+                const option = document.createElement('option');
+                option.value = item.name;
+                foodSuggestions.appendChild(option);
+            });
+
+            recalculateMacrosFromSelection();
+        }
+
+        function getSelectedItemByName() {
+            const typedName = foodNameInput.value.trim().toLowerCase();
+            if (!typedName) return null;
+            const items = getInventoryItems();
+            return items.find((item) => item.name.trim().toLowerCase() === typedName) || null;
+        }
+
+        function recalculateMacrosFromSelection() {
+            const grams = parseFloat(gramsInput.value) || 0;
+            const selectedItem = getSelectedItemByName();
+
+            if (!selectedItem || grams <= 0) {
+                proteinInput.value = '';
+                carbsInput.value = '';
+                return;
+            }
+
+            // Regla de 3: macro_por_100g * gramos / 100
+            const proteinTotal = (selectedItem.protein * grams) / 100;
+            const carbsTotal = (selectedItem.carbs * grams) / 100;
+
+            proteinInput.value = proteinTotal.toFixed(1);
+            carbsInput.value = carbsTotal.toFixed(1);
+        }
+
+        async function saveInventory() {
+            const rows = Array.from(inventoryRows.children)
+                .map((row) => {
+                    const name = row.querySelector('[data-field="name"]').value.trim();
+                    const protein = row.querySelector('[data-field="protein"]').value.trim();
+                    const carbs = row.querySelector('[data-field="carbs"]').value.trim();
+                    return { name, protein, carbs };
+                })
+                .filter((item) => item.name || item.protein || item.carbs);
+
+            localStorage.setItem(INVENTORY_KEY, JSON.stringify(rows));
+            await saveCloudData('saveInventory', INVENTORY_KEY, rows);
+            refreshFoodOptions();
+            if (window.navigator.vibrate) window.navigator.vibrate(12);
+        }
+
+        function loadInventory(inventoryData) {
+            const rowsData = Array.isArray(inventoryData) ? inventoryData : null;
+            const saved = rowsData || parseLocalArray(INVENTORY_KEY);
+            if (!saved || !Array.isArray(saved)) {
+                for (let i = 0; i < 4; i++) addInventoryRow();
+                return;
+            }
+
+            try {
+                const rows = saved;
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    for (let i = 0; i < 4; i++) addInventoryRow();
+                    return;
+                }
+                rows.forEach((item) => addInventoryRow(item));
+            } catch (error) {
+                localStorage.removeItem(INVENTORY_KEY);
+                for (let i = 0; i < 4; i++) addInventoryRow();
+            }
+        }
+
+        async function bootstrapFromCloud() {
+            const [targetsData, inventoryData, dayStateData, historyData] = await Promise.all([
+                loadCloudData('getTargets', TARGETS_KEY, null),
+                loadCloudData('getInventory', INVENTORY_KEY, null),
+                loadCloudData('getDayState', DAY_STATE_KEY, null),
+                loadCloudData('getHistory', HISTORY_KEY, {})
+            ]);
+
+            if (historyData && typeof historyData === 'object' && !Array.isArray(historyData) && Object.keys(historyData).length > 0) {
+                localStorage.setItem(HISTORY_KEY, JSON.stringify(historyData));
+            }
+            if (targetsData && typeof targetsData === 'object' && !Array.isArray(targetsData) && Object.keys(targetsData).length > 0) {
+                localStorage.setItem(TARGETS_KEY, JSON.stringify(targetsData));
+            }
+            if (Array.isArray(inventoryData) && inventoryData.length > 0) {
+                localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventoryData));
+            }
+            if (dayStateData && typeof dayStateData === 'object' && !Array.isArray(dayStateData)) {
+                localStorage.setItem(DAY_STATE_KEY, JSON.stringify(dayStateData));
+            }
+
+            loadTargets(targetsData);
+            loadTodayState(dayStateData);
+            loadInventory(inventoryData);
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const selectedFood = getSelectedItemByName();
+            if (!selectedFood) {
+                foodNameInput.focus();
+                return;
+            }
+
+            const grams = parseFloat(gramsInput.value) || 0;
+            if (grams <= 0) {
+                gramsInput.focus();
+                return;
+            }
+
+            const prot = parseFloat(proteinInput.value) || 0;
+            const energy = parseFloat(carbsInput.value) || 0;
+            const water = parseFloat(document.getElementById('waterQty').value) || 0;
+
+            current.protein += prot;
+            current.energy += energy;
+            current.water += water;
+
+            form.reset();
+            proteinInput.value = '';
+            carbsInput.value = '';
+            updateUI();
+            
+            // Vibración táctil si el dispositivo lo permite
+            if (window.navigator.vibrate) window.navigator.vibrate(10);
+        });
+
+        tabSummary.addEventListener('click', () => setActiveTab('summary'));
+        tabInventory.addEventListener('click', () => setActiveTab('inventory'));
+        tabParameters.addEventListener('click', () => setActiveTab('parameters'));
+        tabStatistics.addEventListener('click', () => setActiveTab('statistics'));
+        saveInventoryBtn.addEventListener('click', saveInventory);
+        saveParamsBtn.addEventListener('click', saveTargets);
+        addInventoryRowBtn.addEventListener('click', () => addInventoryRow());
+        foodNameInput.addEventListener('input', recalculateMacrosFromSelection);
+        foodNameInput.addEventListener('change', recalculateMacrosFromSelection);
+        gramsInput.addEventListener('input', recalculateMacrosFromSelection);
+        targetProteinInput.addEventListener('change', saveTargets);
+        targetEnergyInput.addEventListener('change', saveTargets);
+        targetWaterInput.addEventListener('change', saveTargets);
+        statsMonthInput.addEventListener('change', renderStatistics);
+        closeDayDetailModal.addEventListener('click', closeDayModal);
+        closeDayDetailModalBtn.addEventListener('click', closeDayModal);
+        dayDetailModal.addEventListener('click', (e) => {
+            if (e.target === dayDetailModal) closeDayModal();
+        });
+
+        // Inicio
+        (async function initApp() {
+            statsMonthInput.value = getCurrentMonthValue();
+            await bootstrapFromCloud();
+            refreshFoodOptions();
+            setActiveTab('summary');
+            updateUI();
+        })();
+    </script>
+ </body>
+ </html>
