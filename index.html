@@ -379,7 +379,7 @@
         // Metas diarias configurables
         const targets = { protein: 120, energy: 300, water: 2500 };
         let current = { protein: 0, energy: 0, water: 0 };
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwIvuQII1KgBiKjIq5NTr9s5CQAvZZfsk8uxOwZKXjM-7p7VoCst2P-CLuL6POy_dFy/exec';
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz7M-vIgjnjIQVo7jp9wj-iIWDkh70cxPhl1YKQyyUyOIstfbOCQoIZCtaYAiH-ncNF/exec';
         const INVENTORY_KEY = 'gym_inventory_v1';
         const TARGETS_KEY = 'gym_targets_v1';
         const DAY_STATE_KEY = 'gym_day_state_v1';
@@ -432,7 +432,7 @@
         async function dbPost(action, data) {
             const response = await fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action, data })
             });
             if (!response.ok) throw new Error(`POST ${action} failed`);
