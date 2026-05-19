@@ -105,10 +105,18 @@
         .bar-fill {
             position: absolute;
             left: 0; top: 0; bottom: 0;
-            width: 0%;
+            width: 100%;
             border-radius: 14px;
-            transition: width 0.85s cubic-bezier(0.34, 1.2, 0.64, 1);
             overflow: hidden;
+            transform: scaleX(0);
+            -webkit-transform: scaleX(0);
+            transform-origin: left center;
+            -webkit-transform-origin: left center;
+            transition: transform 0.85s cubic-bezier(0.34, 1.2, 0.64, 1);
+            -webkit-transition: -webkit-transform 0.85s cubic-bezier(0.34, 1.2, 0.64, 1);
+            will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
         }
 
         .bar-fill.protein {
@@ -121,7 +129,14 @@
             box-shadow: 0 0 20px rgba(244, 162, 97, 0.4);
         }
 
-        .bar-fill::before {
+        .bar-fill-inner {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .bar-fill-inner::before {
             content: '';
             position: absolute;
             inset: 0;
@@ -132,9 +147,10 @@
                 transparent 60%
             );
             animation: shimmer 2.2s ease-in-out infinite;
+            -webkit-animation: shimmer 2.2s ease-in-out infinite;
         }
 
-        .bar-fill::after {
+        .bar-fill-inner::after {
             content: '';
             position: absolute;
             bottom: 0; left: 0; right: 0;
@@ -151,27 +167,32 @@
             background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,60 C150,120 350,0 600,60 C850,120 1050,0 1200,60 L1200,120 L0,120 Z' fill='rgba(255,255,255,0.12)'/%3E%3C/svg%3E") repeat-x;
             background-size: 50% 100%;
             animation: wave 3s linear infinite;
+            -webkit-animation: wave 3s linear infinite;
             pointer-events: none;
         }
 
         @keyframes shimmer {
-            0%, 100% { transform: translateX(-100%); opacity: 0; }
-            50% { transform: translateX(100%); opacity: 1; }
+            0%, 100% { -webkit-transform: translateX(-100%); transform: translateX(-100%); opacity: 0; }
+            50% { -webkit-transform: translateX(100%); transform: translateX(100%); opacity: 1; }
+        }
+
+        @-webkit-keyframes shimmer {
+            0%, 100% { -webkit-transform: translateX(-100%); opacity: 0; }
+            50% { -webkit-transform: translateX(100%); opacity: 1; }
         }
 
         @keyframes wave {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(50%); }
+            0% { -webkit-transform: translateX(0); transform: translateX(0); }
+            100% { -webkit-transform: translateX(50%); transform: translateX(50%); }
         }
 
-        .bar-fill.bump {
-            animation: barBump .5s ease;
+        @-webkit-keyframes wave {
+            0% { -webkit-transform: translateX(0); }
+            100% { -webkit-transform: translateX(50%); }
         }
 
-        @keyframes barBump {
-            0% { filter: brightness(1); }
-            40% { filter: brightness(1.35); }
-            100% { filter: brightness(1); }
+        .bar-fill.bump .bar-fill-inner::before {
+            animation-duration: 1.1s;
         }
 
         .pct-label {
@@ -588,54 +609,9 @@
 
         .toast.show { transform: translateX(-50%) translateY(0); }
 
-        .sync-badge {
-            position: fixed;
-            top: 10px;
-            right: 12px;
-            z-index: 150;
-            font-size: 0.65rem;
-            padding: 5px 10px;
-            border-radius: 20px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--muted);
-            max-width: 140px;
-            text-align: center;
-        }
-        .sync-badge.synced { color: var(--green); border-color: var(--green); }
-        .sync-badge.syncing { color: var(--accent); border-color: var(--accent); }
-        .sync-badge.error { color: var(--red); border-color: var(--red); }
-        .sync-badge.local { color: var(--yellow); }
-
-        .app-loading {
-            position: fixed;
-            inset: 0;
-            background: var(--bg);
-            z-index: 400;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-        }
-        .app-loading.hidden { display: none; }
-        .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid var(--border);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin .8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div id="app-loading" class="app-loading">
-        <div class="spinner"></div>
-        <span style="font-size:0.85rem;color:var(--muted);">Conectando...</span>
-    </div>
-    <div id="sync-badge" class="sync-badge local">Solo local</div>
     <div class="app">
         <!-- INICIO -->
         <section id="tab-inicio" class="tab-panel active">
@@ -655,8 +631,10 @@
                     <span>Faltan <strong id="prot-remaining">0</strong> g</span>
                 </div>
                 <div class="bar-track">
-                    <div id="bar-protein" class="bar-fill protein" style="width:0%">
-                        <div class="bar-wave"></div>
+                    <div id="bar-protein" class="bar-fill protein">
+                        <div class="bar-fill-inner">
+                            <div class="bar-wave"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="pct-label" id="pct-protein">0% del objetivo</div>
@@ -678,8 +656,10 @@
                     <span>Faltan <strong id="carb-remaining">0</strong> g</span>
                 </div>
                 <div class="bar-track">
-                    <div id="bar-carbs" class="bar-fill carbs" style="width:0%">
-                        <div class="bar-wave"></div>
+                    <div id="bar-carbs" class="bar-fill carbs">
+                        <div class="bar-fill-inner">
+                            <div class="bar-wave"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="pct-label" id="pct-carbs">0% del objetivo</div>
@@ -709,7 +689,7 @@
         <section id="tab-inventario" class="tab-panel">
             <h1 class="page-title">Inventario</h1>
             <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px;">
-                Valores por cada <strong>100 g</strong> del alimento
+                Valores por cada <strong>100 g</strong> del alimento. Pulsa <strong>Guardar</strong> cuando termines de editar.
             </p>
             <div class="inv-header">
                 <span>Alimento</span>
@@ -717,8 +697,8 @@
                 <span>Carbs (g)</span>
             </div>
             <div id="inventory-rows"></div>
-            <button type="button" class="btn-secondary" id="btn-add-inv-row">+ Agregar fila</button>
             <button type="button" class="btn-primary btn-save" id="btn-save-inventory">GUARDAR INVENTARIO</button>
+            <button type="button" class="btn-secondary" id="btn-add-inv-row">+ Agregar fila</button>
         </section>
 
         <!-- PARÁMETROS -->
@@ -790,10 +770,6 @@
         </button>
     </nav>
 
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="firebase-config.js"></script>
     <script>
     (function () {
         const STORAGE = {
@@ -802,12 +778,6 @@
             logs: 'macroDailyLogs',
             lastDate: 'macroLastActiveDate'
         };
-
-        let db = null;
-        let uid = null;
-        let cloudReady = false;
-        let ignoreSnapshot = false;
-        let syncTimer = null;
 
         const DEFAULT_INVENTORY = [
             { name: 'Pechuga de pollo', proteinPer100: 31, carbsPer100: 0 },
@@ -837,131 +807,6 @@
 
         function saveJSON(key, data) {
             localStorage.setItem(key, JSON.stringify(data));
-            markLocalUpdated();
-            scheduleCloudPush();
-        }
-
-        function setSyncStatus(state, text) {
-            const el = document.getElementById('sync-badge');
-            el.className = 'sync-badge ' + state;
-            el.textContent = text;
-        }
-
-        function isFirebaseConfigured() {
-            return typeof FIREBASE_CONFIG !== 'undefined' &&
-                FIREBASE_CONFIG.apiKey &&
-                !String(FIREBASE_CONFIG.apiKey).includes('PEGAR');
-        }
-
-        function getDataBundle() {
-            return {
-                goals: getGoals(),
-                inventory: getInventory(),
-                logs: getLogs(),
-                lastDate: localStorage.getItem(STORAGE.lastDate) || todayKey()
-            };
-        }
-
-        function applyDataBundle(data) {
-            if (data.goals) saveJSON(STORAGE.goals, data.goals);
-            if (data.inventory && data.inventory.length) saveJSON(STORAGE.inventory, data.inventory);
-            if (data.logs) saveJSON(STORAGE.logs, data.logs);
-            if (data.lastDate) localStorage.setItem(STORAGE.lastDate, data.lastDate);
-        }
-
-        function hasLocalData() {
-            return localStorage.getItem(STORAGE.goals) ||
-                localStorage.getItem(STORAGE.inventory) ||
-                localStorage.getItem(STORAGE.logs);
-        }
-
-        function scheduleCloudPush() {
-            if (!cloudReady || !uid) return;
-            clearTimeout(syncTimer);
-            syncTimer = setTimeout(pushAllToCloud, 400);
-        }
-
-        async function pushAllToCloud() {
-            if (!cloudReady || !uid) return;
-            setSyncStatus('syncing', 'Guardando…');
-            ignoreSnapshot = true;
-            try {
-                await db.collection('users').doc(uid).set({
-                    ...getDataBundle(),
-                    updatedAt: Date.now()
-                });
-                setSyncStatus('synced', 'En la nube ✓');
-            } catch (e) {
-                console.error(e);
-                setSyncStatus('error', 'Error sync');
-            } finally {
-                setTimeout(() => { ignoreSnapshot = false; }, 600);
-            }
-        }
-
-        async function initFirebase() {
-            if (!isFirebaseConfigured()) {
-                setSyncStatus('local', 'Solo local');
-                return;
-            }
-            setSyncStatus('syncing', 'Conectando…');
-            try {
-                firebase.initializeApp(FIREBASE_CONFIG);
-                db = firebase.firestore();
-                const cred = await firebase.auth().signInAnonymously();
-                uid = cred.user.uid;
-
-                const userRef = db.collection('users').doc(uid);
-                const snap = await userRef.get();
-                const localBundle = getDataBundle();
-
-                if (snap.exists) {
-                    const cloud = snap.data();
-                    const cloudTime = cloud.updatedAt || 0;
-                    const localTime = parseInt(localStorage.getItem('macroLocalUpdated') || '0', 10);
-                    if (cloudTime >= localTime || !hasLocalData()) {
-                        ignoreSnapshot = true;
-                        if (cloud.goals) localStorage.setItem(STORAGE.goals, JSON.stringify(cloud.goals));
-                        if (cloud.inventory) localStorage.setItem(STORAGE.inventory, JSON.stringify(cloud.inventory));
-                        if (cloud.logs) localStorage.setItem(STORAGE.logs, JSON.stringify(cloud.logs));
-                        if (cloud.lastDate) localStorage.setItem(STORAGE.lastDate, cloud.lastDate);
-                        setTimeout(() => { ignoreSnapshot = false; }, 300);
-                    } else {
-                        await userRef.set({ ...localBundle, updatedAt: Date.now() });
-                    }
-                } else if (hasLocalData()) {
-                    await userRef.set({ ...localBundle, updatedAt: Date.now() });
-                }
-
-                userRef.onSnapshot(doc => {
-                    if (ignoreSnapshot || !doc.exists) return;
-                    const cloud = doc.data();
-                    const cloudTime = cloud.updatedAt || 0;
-                    const localTime = parseInt(localStorage.getItem('macroLocalUpdated') || '0', 10);
-                    if (cloudTime <= localTime) return;
-                    ignoreSnapshot = true;
-                    if (cloud.goals) localStorage.setItem(STORAGE.goals, JSON.stringify(cloud.goals));
-                    if (cloud.inventory) localStorage.setItem(STORAGE.inventory, JSON.stringify(cloud.inventory));
-                    if (cloud.logs) localStorage.setItem(STORAGE.logs, JSON.stringify(cloud.logs));
-                    if (cloud.lastDate) localStorage.setItem(STORAGE.lastDate, cloud.lastDate);
-                    checkDayChange();
-                    updateBars(false);
-                    renderTodayFoods();
-                    loadGoalsUI();
-                    setTimeout(() => { ignoreSnapshot = false; }, 300);
-                });
-
-                cloudReady = true;
-                setSyncStatus('synced', 'En la nube ✓');
-            } catch (e) {
-                console.error(e);
-                setSyncStatus('error', 'Sin conexión');
-                showToast('Firebase no conectó. Revisa la configuración.');
-            }
-        }
-
-        function markLocalUpdated() {
-            localStorage.setItem('macroLocalUpdated', String(Date.now()));
         }
 
         function getGoals() {
@@ -969,8 +814,23 @@
         }
 
         function getInventory() {
-            const inv = loadJSON(STORAGE.inventory, null);
-            return inv && inv.length ? inv : [...DEFAULT_INVENTORY];
+            if (localStorage.getItem(STORAGE.inventory) === null) {
+                return [...DEFAULT_INVENTORY];
+            }
+            const inv = loadJSON(STORAGE.inventory, []);
+            return Array.isArray(inv) ? inv : [...DEFAULT_INVENTORY];
+        }
+
+        function readInventoryFromDOM() {
+            const inv = [];
+            document.querySelectorAll('#inventory-rows .inv-row').forEach(row => {
+                inv.push({
+                    name: row.querySelector('.inv-name').value.trim(),
+                    proteinPer100: parseFloat(row.querySelector('.inv-prot').value) || 0,
+                    carbsPer100: parseFloat(row.querySelector('.inv-carb').value) || 0
+                });
+            });
+            return inv;
         }
 
         function getLogs() {
@@ -1033,6 +893,13 @@
             setTimeout(() => t.classList.remove('show'), 2800);
         }
 
+        function setBarProgress(barEl, pct) {
+            const scale = (Math.max(0, Math.min(100, pct)) / 100).toFixed(4);
+            const t = 'scaleX(' + scale + ')';
+            barEl.style.transform = t;
+            barEl.style.webkitTransform = t;
+        }
+
         function updateBars(animate) {
             const goals = getGoals();
             const log = getTodayLog();
@@ -1042,15 +909,22 @@
             const barP = document.getElementById('bar-protein');
             const barC = document.getElementById('bar-carbs');
 
-            barP.style.width = protPct + '%';
-            barC.style.width = carbPct + '%';
-
             if (animate) {
                 barP.classList.remove('bump');
                 barC.classList.remove('bump');
-                void barP.offsetWidth;
-                barP.classList.add('bump');
-                barC.classList.add('bump');
+                setBarProgress(barP, 0);
+                setBarProgress(barC, 0);
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        setBarProgress(barP, protPct);
+                        setBarProgress(barC, carbPct);
+                        barP.classList.add('bump');
+                        barC.classList.add('bump');
+                    });
+                });
+            } else {
+                setBarProgress(barP, protPct);
+                setBarProgress(barC, carbPct);
             }
 
             document.getElementById('prot-current').textContent = Math.round(log.protein);
@@ -1189,7 +1063,10 @@
 
         /* ——— Inventario ——— */
         function renderInventoryRows() {
-            const inv = getInventory();
+            let inv = getInventory();
+            if (!inv.length) {
+                inv = [{ name: '', proteinPer100: 0, carbsPer100: 0 }];
+            }
             const container = document.getElementById('inventory-rows');
             container.innerHTML = inv.map((item, i) => `
                 <div class="inv-row" data-index="${i}">
@@ -1201,27 +1078,23 @@
         }
 
         document.getElementById('btn-add-inv-row').addEventListener('click', () => {
-            const inv = getInventory();
+            const inv = readInventoryFromDOM();
             inv.push({ name: '', proteinPer100: 0, carbsPer100: 0 });
             saveJSON(STORAGE.inventory, inv);
             renderInventoryRows();
+            showToast('Fila agregada');
         });
 
         document.getElementById('btn-save-inventory').addEventListener('click', () => {
-            const rows = document.querySelectorAll('.inv-row');
-            const inv = [];
-            rows.forEach(row => {
-                const name = row.querySelector('.inv-name').value.trim();
-                const proteinPer100 = parseFloat(row.querySelector('.inv-prot').value) || 0;
-                const carbsPer100 = parseFloat(row.querySelector('.inv-carb').value) || 0;
-                if (name) inv.push({ name, proteinPer100, carbsPer100 });
-            });
+            const allRows = readInventoryFromDOM();
+            const inv = allRows.filter(item => item.name);
             if (!inv.length) {
-                showToast('Agrega al menos un alimento');
+                showToast('Escribe al menos un alimento con nombre');
                 return;
             }
             saveJSON(STORAGE.inventory, inv);
-            showToast('Inventario guardado');
+            renderInventoryRows();
+            showToast('Inventario guardado ✓');
         });
 
         /* ——— Parámetros ——— */
@@ -1319,12 +1192,12 @@
                 <div class="macro-block">
                     <div class="macro-header"><span class="label">PROTEÍNA</span></div>
                     <div class="bar-stats"><span>${Math.round(prot)}g</span><span>${Math.round(protPct)}%</span></div>
-                    <div class="bar-track"><div class="bar-fill protein" style="width:${protPct}%"><div class="bar-wave"></div></div></div>
+                    <div class="bar-track"><div class="bar-fill protein" style="transform:scaleX(${protPct / 100});-webkit-transform:scaleX(${protPct / 100})"><div class="bar-fill-inner"><div class="bar-wave"></div></div></div>
                 </div>
                 <div class="macro-block">
                     <div class="macro-header"><span class="label">CARBOHIDRATOS</span></div>
                     <div class="bar-stats"><span>${Math.round(carbs)}g</span><span>${Math.round(carbPct)}%</span></div>
-                    <div class="bar-track"><div class="bar-fill carbs" style="width:${carbPct}%"><div class="bar-wave"></div></div></div>
+                    <div class="bar-track"><div class="bar-fill carbs" style="transform:scaleX(${carbPct / 100});-webkit-transform:scaleX(${carbPct / 100})"><div class="bar-fill-inner"><div class="bar-wave"></div></div></div>
                 </div>
             `;
 
@@ -1359,6 +1232,11 @@
         document.querySelectorAll('.nav-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tab = btn.dataset.tab;
+                const inventarioActivo = document.getElementById('tab-inventario').classList.contains('active');
+                if (inventarioActivo && tab !== 'inventario') {
+                    const inv = readInventoryFromDOM().filter(item => item.name);
+                    if (inv.length) saveJSON(STORAGE.inventory, inv);
+                }
                 document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
                 btn.classList.add('active');
@@ -1370,25 +1248,17 @@
         });
 
         /* ——— Init ——— */
-        async function init() {
+        function init() {
             checkDayChange();
-            if (!localStorage.getItem(STORAGE.inventory)) {
-                localStorage.setItem(STORAGE.inventory, JSON.stringify(DEFAULT_INVENTORY));
-                markLocalUpdated();
+            if (localStorage.getItem(STORAGE.inventory) === null) {
+                saveJSON(STORAGE.inventory, DEFAULT_INVENTORY);
             }
             if (!localStorage.getItem(STORAGE.goals)) {
-                localStorage.setItem(STORAGE.goals, JSON.stringify({ protein: 150, carbs: 200 }));
-                markLocalUpdated();
+                saveJSON(STORAGE.goals, { protein: 150, carbs: 200 });
             }
 
             loadGoalsUI();
             renderInventoryRows();
-            updateBars(false);
-            renderTodayFoods();
-
-            await initFirebase();
-
-            document.getElementById('app-loading').classList.add('hidden');
             updateBars(false);
             renderTodayFoods();
 
